@@ -1,0 +1,125 @@
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: users
+// Document ID: userId
+// Fields:
+//   - id: string (required)
+//   - name: string (required, < 50 chars)
+//   - avatar: string (required, URL)
+//   - role: string (required, enum: ['admin', 'user'])
+//
+// Collection: channels
+// Document ID: channelId
+// Fields:
+//   - id: string (required)
+//   - name: string (required, < 50 chars)
+//   - type: string (required, enum: ['public', 'private'])
+//   - createdBy: string (required, userId)
+//
+// Collection: messages
+// Document ID: messageId
+// Fields:
+//   - id: string (required)
+//   - senderId: string (required, userId)
+//   - content: string (required, < 5000 chars)
+//   - channelId: string (optional, channelId)
+//   - receiverId: string (optional, userId)
+//   - timestamp: timestamp (required)
+//   - fileUrl: string (optional, URL)
+//   - fileName: string (optional, < 100 chars)
+//   - threadId: string (optional, messageId)
+//
+// ===============================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "mozangies@gmail.com" && request.auth.token.email_verified == true)); // Default admin
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['id', 'name', 'role', 'color', 'initial']) &&
+             data.id is string && data.id.size() > 0 && data.id.size() < 50 &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 50 &&
+             (!('avatar' in data) || (data.avatar is string && data.avatar.size() < 1000)) &&
+             data.color is string && data.color.size() < 50 &&
+             data.initial is string && data.initial.size() == 1 &&
+             data.role in ['admin', 'user'];
+    }
+
+    function isValidWorkspace(data) {
+      return data.keys().hasAll(['id', 'name', 'color', 'initial', 'members']) &&
+             data.id is string && data.id.size() > 0 && data.id.size() < 50 &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 50 &&
+             data.color is string && data.color.size() < 50 &&
+             data.initial is string && data.initial.size() == 1 &&
+             data.members is list;
+    }
+
+    function isValidChannel(data) {
+      return data.keys().hasAll(['id', 'name', 'type', 'createdBy']) &&
+             data.id is string && data.id.size() > 0 && data.id.size() < 50 &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 50 &&
+             data.type in ['public', 'private'] &&
+             data.createdBy is string && data.createdBy.size() < 50;
+    }
+
+    function isValidMessage(data) {
+      return data.keys().hasAll(['id', 'senderId', 'content', 'timestamp']) &&
+             data.id is string && data.id.size() > 0 && data.id.size() < 50 &&
+             data.senderId is string && data.senderId.size() < 50 &&
+             data.content is string && data.content.size() <= 5000 &&
+             data.timestamp is timestamp &&
+             (!('fileUrl' in data) || (data.fileUrl is string && data.fileUrl.size() < 1000)) &&
+             (!('fileName' in data) || (data.fileName is string && data.fileName.size() < 255));
+    }
+
+    function isUnchanged(field) {
+      return !(field in request.resource.data) || request.resource.data[field] == resource.data[field];
+    }
+
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /workspaces/{workspaceId} {
+      allow read: if true;
+      allow create, update: if isValidWorkspace(request.resource.data);
+      allow delete: if true;
+    }
+
+    match /users/{userId} {
+      allow read: if true;
+      allow create, update: if isValidUser(request.resource.data);
+      allow delete: if true; // Admin can delete
+    }
+
+    match /channels/{channelId} {
+      allow read: if true;
+      allow create, update: if isValidChannel(request.resource.data);
+      allow delete: if true; // Admin can delete
+    }
+
+    match /messages/{messageId} {
+      allow read: if true;
+      allow create: if isValidMessage(request.resource.data);
+      allow update: if isValidMessage(request.resource.data) && isUnchanged('id') && isUnchanged('senderId');
+      allow delete: if true; // Admin can delete
+    }
+  }
+}
