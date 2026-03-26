@@ -7,11 +7,20 @@
       "properties": {
         "id": { "type": "string", "description": "The unique ID of the user." },
         "name": { "type": "string", "description": "The display name of the user." },
+        "username": { "type": "string", "description": "The username of the user." },
+        "password": { "type": "string", "description": "The password of the user." },
         "avatar": { "type": "string", "description": "The avatar URL of the user." },
+        "color": { "type": "string", "description": "The background color of the user icon." },
+        "initial": { "type": "string", "description": "The initial letter of the user name." },
         "role": { "type": "string", "enum": ["admin", "user"], "description": "The role of the user." },
-        "workspaces": { "type": "array", "items": { "type": "string" }, "description": "IDs of workspaces the user is a member of." }
+        "gender": { "type": "string", "enum": ["male", "female"], "description": "The gender of the user." },
+        "isOnline": { "type": "boolean", "description": "Whether the user is online." },
+        "lastSeen": { "type": "string", "format": "date-time", "description": "The last time the user was seen." },
+        "workspaces": { "type": "array", "items": { "type": "string" }, "description": "IDs of workspaces the user is a member of." },
+        "starredChannels": { "type": "array", "items": { "type": "string" }, "description": "IDs of starred channels." },
+        "starredDMs": { "type": "array", "items": { "type": "string" }, "description": "IDs of starred DMs." }
       },
-      "required": ["id", "name", "avatar", "role"]
+      "required": ["id", "name", "role"]
     },
     "Workspace": {
       "title": "Workspace",
@@ -51,9 +60,26 @@
         "channelId": { "type": "string", "description": "The ID of the channel (if it's a channel message)." },
         "receiverId": { "type": "string", "description": "The ID of the receiver (if it's a direct message)." },
         "timestamp": { "type": "string", "format": "date-time", "description": "The time the message was sent." },
-        "fileUrl": { "type": "string", "description": "The URL of an attached file." },
-        "fileName": { "type": "string", "description": "The name of an attached file." },
-        "threadId": { "type": "string", "description": "The ID of the parent message (if it's a reply)." }
+        "files": { 
+          "type": "array", 
+          "items": { 
+            "type": "object",
+            "properties": {
+              "url": { "type": "string" },
+              "name": { "type": "string" },
+              "type": { "type": "string" }
+            }
+          },
+          "description": "Attached files." 
+        },
+        "threadId": { "type": "string", "description": "The ID of the parent message (if it's a reply)." },
+        "replyCount": { "type": "integer", "description": "Number of replies in the thread." },
+        "reactions": { 
+          "type": "object", 
+          "description": "Reactions to the message.",
+          "additionalProperties": { "type": "array", "items": { "type": "string" } }
+        },
+        "isVoiceNote": { "type": "boolean", "description": "Whether the message is a voice note." }
       },
       "required": ["id", "senderId", "content", "timestamp"]
     }

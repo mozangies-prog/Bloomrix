@@ -21,7 +21,7 @@ interface AdminPanelProps {
   users: User[];
   channels: Channel[];
   workspaces: Workspace[];
-  onCreateUser: (name: string, username: string, password: string, avatar: string, role: UserRole) => void;
+  onCreateUser: (name: string, username: string, password: string, avatar: string, role: UserRole, gender?: 'male' | 'female') => void;
   onDeleteUser: (userId: string) => void;
   onCreateChannel: (name: string, type: ChannelType) => void;
   onDeleteChannel: (channelId: string) => void;
@@ -51,6 +51,7 @@ export default function AdminPanel({
   const [newUserUsername, setNewUserUsername] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserRole, setNewUserRole] = useState<UserRole>('user');
+  const [newUserGender, setNewUserGender] = useState<'male' | 'female'>('male');
   const [newChannelName, setNewChannelName] = useState('');
   const [newChannelType, setNewChannelType] = useState<ChannelType>('public');
   const [newWorkspaceName, setNewWorkspaceName] = useState('');
@@ -62,7 +63,7 @@ export default function AdminPanel({
     e.preventDefault();
     if (newUserName.trim() && newUserUsername.trim() && newUserPassword.trim()) {
       const avatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${newUserName}`;
-      onCreateUser(newUserName, newUserUsername, newUserPassword, avatar, newUserRole);
+      onCreateUser(newUserName, newUserUsername, newUserPassword, avatar, newUserRole, newUserGender);
       setNewUserName('');
       setNewUserUsername('');
       setNewUserPassword('');
@@ -80,7 +81,8 @@ export default function AdminPanel({
   const handleCreateWorkspace = (e: React.FormEvent) => {
     e.preventDefault();
     if (newWorkspaceName.trim()) {
-      onCreateWorkspace(newWorkspaceName, newWorkspaceColor, newWorkspaceName[0].toUpperCase());
+      const firstWord = newWorkspaceName.trim().split(' ')[0];
+      onCreateWorkspace(newWorkspaceName, newWorkspaceColor, firstWord);
       setNewWorkspaceName('');
     }
   };
@@ -177,11 +179,23 @@ export default function AdminPanel({
                     {users.map(user => {
                       const isMember = (currentManagingItem.members || []).includes(user.id);
                       return (
-                        <div key={user.id} className="p-4 border border-gray-100 rounded-xl flex items-center justify-between hover:bg-gray-50 transition-colors">
-                          <div className="flex items-center">
-                            <img src={user.avatar} alt={user.name} className="w-8 h-8 rounded-lg mr-3" />
-                            <span className="font-medium text-gray-900">{user.name}</span>
-                          </div>
+                          <div key={user.id} className="p-4 border border-gray-100 rounded-xl flex items-center justify-between hover:bg-gray-50 transition-colors">
+                            <div className="flex items-center">
+                              {user.avatar ? (
+                                <img src={user.avatar} alt={user.name} className="w-8 h-8 rounded-lg mr-3" />
+                              ) : user.gender ? (
+                                <img 
+                                  src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user.gender === 'male' ? 'Felix' : 'Aneka'}`} 
+                                  alt={user.name} 
+                                  className="w-8 h-8 rounded-lg mr-3 bg-gray-200" 
+                                />
+                              ) : (
+                                <div className={cn("w-8 h-8 rounded-lg mr-3 flex items-center justify-center text-white font-bold", user.color)}>
+                                  {user.initial}
+                                </div>
+                              )}
+                              <span className="font-medium text-gray-900">{user.name}</span>
+                            </div>
                           <button 
                             onClick={() => onUpdateMembership(managingMembers.type, managingMembers.id, user.id, isMember ? 'remove' : 'add')}
                             className={cn(
@@ -252,6 +266,17 @@ export default function AdminPanel({
                       <option value="admin">Administrator</option>
                     </select>
                   </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Gender</label>
+                    <select 
+                      value={newUserGender}
+                      onChange={(e) => setNewUserGender(e.target.value as 'male' | 'female')}
+                      className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#4A154B] focus:border-transparent transition-all"
+                    >
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                    </select>
+                  </div>
                   <button 
                     type="submit"
                     className="w-full py-2 bg-[#4A154B] text-white font-bold rounded-lg hover:bg-[#350D36] transition-colors shadow-md"
@@ -266,8 +291,8 @@ export default function AdminPanel({
                 <h3 className="text-lg font-bold text-gray-900 flex items-center justify-between">
                   <span>Current Users</span>
                 </h3>
-                <div className="border border-gray-100 rounded-xl overflow-hidden shadow-sm">
-                  <table className="w-full text-left">
+                <div className="border border-gray-100 rounded-xl overflow-x-auto shadow-sm">
+                  <table className="w-full text-left min-w-[600px]">
                     <thead className="bg-gray-50 text-xs font-bold text-gray-500 uppercase tracking-wider">
                       <tr>
                         <th className="px-6 py-3">User</th>
@@ -275,6 +300,7 @@ export default function AdminPanel({
                         <th className="px-6 py-3">Username</th>
                         <th className="px-6 py-3">Password</th>
                         <th className="px-6 py-3">Role</th>
+                        <th className="px-6 py-3">Gender</th>
                         <th className="px-6 py-3 text-right">Actions</th>
                       </tr>
                     </thead>
@@ -287,6 +313,13 @@ export default function AdminPanel({
                                 src={user.avatar} 
                                 alt={user.name} 
                                 className="w-8 h-8 rounded-lg mr-3 object-cover"
+                                referrerPolicy="no-referrer"
+                              />
+                            ) : user.gender ? (
+                              <img 
+                                src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user.gender === 'male' ? 'Felix' : 'Aneka'}`} 
+                                alt={user.name} 
+                                className="w-8 h-8 rounded-lg mr-3 object-cover bg-gray-200"
                                 referrerPolicy="no-referrer"
                               />
                             ) : (
@@ -336,6 +369,16 @@ export default function AdminPanel({
                             )}>
                               {user.role}
                             </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <select 
+                              value={user.gender || 'male'}
+                              onChange={(e) => onUpdateUser(user.id, { gender: e.target.value as 'male' | 'female' })}
+                              className="text-xs text-gray-600 bg-transparent border border-gray-100 rounded px-1 focus:ring-1 focus:ring-purple-200"
+                            >
+                              <option value="male">Male</option>
+                              <option value="female">Female</option>
+                            </select>
                           </td>
                           <td className="px-6 py-4 text-right">
                             <button 

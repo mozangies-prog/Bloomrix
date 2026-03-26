@@ -22,7 +22,8 @@ import {
   Play,
   Pause,
   Download,
-  File as FileIcon
+  File as FileIcon,
+  Menu
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
@@ -39,6 +40,7 @@ interface ChatPanelProps {
   onTyping: (isTyping: boolean) => void;
   onSearch: (query: string) => void;
   onToggleStar: (type: 'channel' | 'dm', id: string) => void;
+  onToggleSidebar?: () => void;
 }
 
 export default function ChatPanel({
@@ -52,7 +54,8 @@ export default function ChatPanel({
   onReact,
   onTyping,
   onSearch,
-  onToggleStar
+  onToggleStar,
+  onToggleSidebar
 }: ChatPanelProps) {
   const [input, setInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -148,6 +151,7 @@ export default function ChatPanel({
 
     setUploadPreviews(prev => [...prev, ...newPreviews]);
     setIsUploading(false);
+    if (e.target) e.target.value = '';
   };
 
   const startRecording = async () => {
@@ -226,16 +230,24 @@ export default function ChatPanel({
     <div className="flex-1 flex bg-white h-full overflow-hidden">
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <div className="border-b border-gray-200">
+        <div className="border-b border-gray-200 flex-shrink-0">
           <div className="h-12 px-4 flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <button className="flex items-center space-x-1 hover:bg-gray-100 px-2 py-1 rounded">
-                <div className="text-gray-500">{icon}</div>
-                <h2 className="text-base font-bold text-gray-900">{title}</h2>
+            <div className="flex items-center space-x-2 min-w-0">
+              {onToggleSidebar && (
+                <button 
+                  onClick={onToggleSidebar}
+                  className="md:hidden p-1.5 hover:bg-gray-100 rounded text-gray-500 flex-shrink-0"
+                >
+                  <Menu className="w-5 h-5" />
+                </button>
+              )}
+              <button className="flex items-center space-x-1 hover:bg-gray-100 px-2 py-1 rounded min-w-0">
+                <div className="text-gray-500 flex-shrink-0">{icon}</div>
+                <h2 className="text-base font-bold text-gray-900 truncate">{title}</h2>
                 {activeDMUser && (
-                  <div className={cn("w-2 h-2 rounded-full", activeDMUser.isOnline ? "bg-green-500" : "bg-gray-500")} />
+                  <div className={cn("w-2 h-2 rounded-full flex-shrink-0", activeDMUser.isOnline ? "bg-green-500" : "bg-gray-500")} />
                 )}
-                <ChevronDown className="w-4 h-4 text-gray-500" />
+                <ChevronDown className="w-4 h-4 text-gray-500 flex-shrink-0" />
               </button>
             </div>
             <div className="flex items-center space-x-1">
@@ -265,7 +277,7 @@ export default function ChatPanel({
             ) : (
               filteredMessages.map((msg, idx) => {
                 const showAvatar = idx === 0 || filteredMessages[idx - 1].senderId !== msg.senderId;
-                const msgDate = msg.timestamp?.toDate ? msg.timestamp.toDate() : (msg.timestamp ? new Date(msg.timestamp) : new Date());
+                const msgDate = msg.timestamp?.toDate ? msg.timestamp.toDate() : (msg.timestamp ? new Date(msg.timestamp.seconds * 1000) : new Date());
                 const prevMsgDate = filteredMessages[idx-1]?.timestamp?.toDate ? filteredMessages[idx-1].timestamp.toDate() : null;
                 const showDateHeader = idx === 0 || (prevMsgDate && format(prevMsgDate, 'yyyy-MM-dd') !== format(msgDate, 'yyyy-MM-dd'));
 
@@ -300,14 +312,25 @@ export default function ChatPanel({
                   {users
                     .filter(u => u.name.toLowerCase().includes(mentionSearch.toLowerCase()))
                     .map(user => (
-                      <button
-                        key={user.id}
-                        onClick={() => handleMentionSelect(user)}
-                        className="w-full px-3 py-2 flex items-center hover:bg-gray-100 text-left"
-                      >
-                        <img src={user.avatar} className="w-6 h-6 rounded mr-2" />
-                        <span className="text-sm font-medium text-gray-900">{user.name}</span>
-                      </button>
+                        <button
+                          key={user.id}
+                          onClick={() => handleMentionSelect(user)}
+                          className="w-full px-3 py-2 flex items-center hover:bg-gray-100 text-left"
+                        >
+                          {user.avatar ? (
+                            <img src={user.avatar} className="w-6 h-6 rounded mr-2" />
+                          ) : user.gender ? (
+                            <img 
+                              src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user.gender === 'male' ? 'Felix' : 'Aneka'}`} 
+                              className="w-6 h-6 rounded mr-2 bg-gray-200" 
+                            />
+                          ) : (
+                            <div className={cn("w-6 h-6 rounded mr-2 flex items-center justify-center text-[10px] text-white font-bold", user.color)}>
+                              {user.initial}
+                            </div>
+                          )}
+                          <span className="text-sm font-medium text-gray-900">{user.name}</span>
+                        </button>
                     ))}
                 </div>
               </div>
@@ -422,9 +445,12 @@ export default function ChatPanel({
         {activeThreadId && parentMessage && (
           <motion.div 
             initial={{ width: 0, opacity: 0 }}
-            animate={{ width: 400, opacity: 1 }}
+            animate={{ width: window.innerWidth < 768 ? '100%' : 400, opacity: 1 }}
             exit={{ width: 0, opacity: 0 }}
-            className="border-l border-gray-200 bg-white flex flex-col"
+            className={cn(
+              "border-l border-gray-200 bg-white flex flex-col z-30",
+              window.innerWidth < 768 ? "fixed inset-0" : "relative"
+            )}
           >
             <div className="h-12 px-4 flex items-center justify-between border-b border-gray-200">
               <h2 className="text-base font-bold text-gray-900">Thread</h2>
@@ -437,7 +463,7 @@ export default function ChatPanel({
                 msg={parentMessage}
                 showAvatar={true}
                 showDateHeader={false}
-                msgDate={parentMessage.timestamp?.toDate ? parentMessage.timestamp.toDate() : (parentMessage.timestamp ? new Date(parentMessage.timestamp) : new Date())}
+                msgDate={parentMessage.timestamp?.toDate ? parentMessage.timestamp.toDate() : (parentMessage.timestamp ? new Date(parentMessage.timestamp.seconds * 1000) : new Date())}
                 users={users}
                 currentUser={currentUser}
                 isThreadParent={true}
@@ -453,7 +479,7 @@ export default function ChatPanel({
                   msg={msg}
                   showAvatar={idx === 0 || threadMessages[idx - 1].senderId !== msg.senderId}
                   showDateHeader={false}
-                  msgDate={msg.timestamp?.toDate ? msg.timestamp.toDate() : (msg.timestamp ? new Date(msg.timestamp) : new Date())}
+                  msgDate={msg.timestamp?.toDate ? msg.timestamp.toDate() : (msg.timestamp ? new Date(msg.timestamp.seconds * 1000) : new Date())}
                   users={users}
                   currentUser={currentUser}
                 />
@@ -549,6 +575,13 @@ function MessageItem({
                   src={sender.avatar} 
                   alt="Avatar" 
                   className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              ) : sender?.gender ? (
+                <img 
+                  src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${sender.gender === 'male' ? 'Felix' : 'Aneka'}`} 
+                  alt="Avatar" 
+                  className="w-full h-full object-cover bg-gray-200"
                   referrerPolicy="no-referrer"
                 />
               ) : (

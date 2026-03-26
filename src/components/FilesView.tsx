@@ -89,6 +89,13 @@ export default function FilesView({
                     <div className="w-5 h-5 rounded overflow-hidden shrink-0">
                       {sender?.avatar ? (
                         <img src={sender.avatar} alt={sender.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      ) : sender?.gender ? (
+                        <img 
+                          src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${sender.gender === 'male' ? 'Felix' : 'Aneka'}`} 
+                          alt={sender.name} 
+                          className="w-full h-full object-cover bg-gray-200" 
+                          referrerPolicy="no-referrer" 
+                        />
                       ) : (
                         <div className={cn("w-full h-full flex items-center justify-center text-white font-bold text-[8px]", sender?.color || 'bg-gray-400')}>
                           {sender?.initial || '?'}

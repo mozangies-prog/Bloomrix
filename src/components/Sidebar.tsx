@@ -19,7 +19,8 @@ import {
   Search,
   Clock,
   User as UserIcon,
-  LayoutGrid
+  LayoutGrid,
+  X
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -37,6 +38,7 @@ interface SidebarProps {
   onSelectView: (view: 'home' | 'dms' | 'activity' | 'files') => void;
   onOpenAdmin: () => void;
   onLogout: () => void;
+  onClose?: () => void;
 }
 
 export default function Sidebar({
@@ -53,7 +55,8 @@ export default function Sidebar({
   onSelectDM,
   onSelectView,
   onOpenAdmin,
-  onLogout
+  onLogout,
+  onClose
 }: SidebarProps) {
   const otherUsers = users.filter(u => u.id !== currentUser.id);
   const activeWorkspace = workspaces.find(w => w.id === activeWorkspaceId);
@@ -62,19 +65,19 @@ export default function Sidebar({
     { icon: Home, label: 'Home', id: 'home' as const },
     { icon: MessageSquare, label: 'DMs', id: 'dms' as const },
     { icon: Files, label: 'Files', id: 'files' as const },
-    { icon: Settings, label: 'Admin', id: 'admin' as const, onClick: onOpenAdmin },
+    ...(currentUser.role === 'admin' ? [{ icon: Settings, label: 'Admin', id: 'admin' as const, onClick: onOpenAdmin }] : []),
   ];
 
   return (
-    <div className="flex h-full overflow-hidden">
+    <div className="flex h-full overflow-hidden w-full md:w-auto">
       {/* Workspace Rail */}
-      <div className="w-[70px] bg-[#19171d] flex flex-col items-center py-4 space-y-4 border-r border-white/10">
+      <div className="w-[70px] bg-[#19171d] flex flex-col items-center py-4 space-y-4 border-r border-white/10 flex-shrink-0">
         {workspaces.map(ws => (
           <div 
             key={ws.id} 
             onClick={() => onSelectWorkspace(ws.id)}
             className={cn(
-              "w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-lg cursor-pointer hover:rounded-lg transition-all",
+              "w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold text-[10px] leading-tight cursor-pointer hover:rounded-lg transition-all text-center px-1 overflow-hidden",
               ws.color,
               ws.id === activeWorkspaceId ? "ring-2 ring-white ring-offset-2 ring-offset-[#19171d]" : ""
             )}
@@ -93,7 +96,7 @@ export default function Sidebar({
       </div>
 
       {/* Nav Rail */}
-      <div className="w-[70px] bg-[#3f0e40] flex flex-col items-center py-4 justify-between border-r border-white/10">
+      <div className="w-[70px] bg-[#3f0e40] flex flex-col items-center py-4 justify-between border-r border-white/10 flex-shrink-0">
         <div className="flex flex-col items-center space-y-6 w-full">
           {navItems.map((item, idx) => {
             const isActive = item.id === activeView;
@@ -118,41 +121,49 @@ export default function Sidebar({
           })}
         </div>
 
-        <button 
-          onClick={onLogout}
-          className="w-10 h-10 rounded-lg overflow-hidden border-2 border-transparent hover:border-green-500 transition-all relative group"
-        >
-          {currentUser.avatar ? (
-            <img 
-              src={currentUser.avatar} 
-              alt={currentUser.name} 
-              className="w-full h-full object-cover"
-              referrerPolicy="no-referrer"
-            />
-          ) : (
-            <div className={cn("w-full h-full flex items-center justify-center text-white font-bold", currentUser.color)}>
-              {currentUser.initial}
+        <div className="flex flex-col items-center space-y-2 w-full px-1">
+          <button 
+            onClick={onLogout}
+            className="w-10 h-10 rounded-lg overflow-hidden border-2 border-transparent hover:border-green-500 transition-all relative group flex-shrink-0"
+          >
+            {currentUser.avatar ? (
+              <img 
+                src={currentUser.avatar} 
+                alt={currentUser.name} 
+                className="w-full h-full object-cover"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <div className={cn("w-full h-full flex items-center justify-center text-white font-bold", currentUser.color)}>
+                {currentUser.initial}
+              </div>
+            )}
+            <div className={cn(
+              "absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-[#3f0e40]",
+              currentUser.isOnline ? "bg-green-500" : "bg-gray-500"
+            )} />
+            <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+              <LogOut className="w-4 h-4 text-white" />
             </div>
-          )}
-          <div className={cn(
-            "absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-[#3f0e40]",
-            currentUser.isOnline ? "bg-green-500" : "bg-gray-500"
-          )} />
-          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-            <LogOut className="w-4 h-4 text-white" />
-          </div>
-        </button>
+          </button>
+          <span className="text-[9px] text-gray-400 font-medium truncate w-full text-center">{currentUser.name.split(' ')[0]}</span>
+        </div>
       </div>
 
       {/* Main Sidebar */}
       <div className="w-64 bg-[#3f0e40] text-gray-300 flex flex-col h-full">
         {/* Header */}
         <div className="p-4 flex items-center justify-between hover:bg-white/5 cursor-pointer group">
-          <div className="flex items-center">
-            <h1 className="text-lg font-bold text-white truncate max-w-[140px]">{activeWorkspace?.name || 'Select Workspace'}</h1>
-            <ChevronDown className="w-4 h-4 ml-1 opacity-60 group-hover:opacity-100" />
+          <div className="flex items-center min-w-0">
+            <h1 className="text-lg font-bold text-white truncate">{activeWorkspace?.name || 'Select Workspace'}</h1>
+            <ChevronDown className="w-4 h-4 ml-1 opacity-60 group-hover:opacity-100 flex-shrink-0" />
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 flex-shrink-0">
+            {onClose && (
+              <button onClick={onClose} className="md:hidden p-1 hover:bg-white/10 rounded text-white">
+                <X className="w-5 h-5" />
+              </button>
+            )}
             {currentUser.role === 'admin' && (
               <div onClick={onOpenAdmin} className="w-8 h-8 rounded-md flex items-center justify-center hover:bg-white/10">
                 <Plus className="w-5 h-5" />
@@ -206,6 +217,13 @@ export default function Sidebar({
                         src={user.avatar} 
                         alt={user.name} 
                         className="w-5 h-5 rounded object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : user.gender ? (
+                      <img 
+                        src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user.gender === 'male' ? 'Felix' : 'Aneka'}`} 
+                        alt={user.name} 
+                        className="w-5 h-5 rounded object-cover bg-gray-200"
                         referrerPolicy="no-referrer"
                       />
                     ) : (
@@ -290,6 +308,13 @@ export default function Sidebar({
                             src={user.avatar} 
                             alt={user.name} 
                             className="w-5 h-5 rounded object-cover"
+                            referrerPolicy="no-referrer"
+                          />
+                        ) : user.gender ? (
+                          <img 
+                            src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user.gender === 'male' ? 'Felix' : 'Aneka'}`} 
+                            alt={user.name} 
+                            className="w-5 h-5 rounded object-cover bg-gray-200"
                             referrerPolicy="no-referrer"
                           />
                         ) : (

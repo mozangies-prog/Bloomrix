@@ -88,6 +88,13 @@ export default function DMsView({
                 <div className="w-12 h-12 rounded overflow-hidden">
                   {user.avatar ? (
                     <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  ) : user.gender ? (
+                    <img 
+                      src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user.gender === 'male' ? 'Felix' : 'Aneka'}`} 
+                      alt={user.name} 
+                      className="w-full h-full object-cover bg-gray-200" 
+                      referrerPolicy="no-referrer" 
+                    />
                   ) : (
                     <div className={cn("w-full h-full flex items-center justify-center text-white font-bold text-lg", user.color)}>
                       {user.initial}

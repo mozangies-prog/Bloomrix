@@ -57,8 +57,9 @@ service cloud.firestore {
              data.name is string && data.name.size() > 0 && data.name.size() < 50 &&
              (!('avatar' in data) || (data.avatar is string && data.avatar.size() < 1000)) &&
              data.color is string && data.color.size() < 50 &&
-             data.initial is string && data.initial.size() == 1 &&
+             data.initial is string && data.initial.size() > 0 && data.initial.size() < 20 &&
              data.role in ['admin', 'user'] &&
+             (!('gender' in data) || data.gender in ['male', 'female']) &&
              (!('isOnline' in data) || data.isOnline is bool) &&
              (!('lastSeen' in data) || data.lastSeen is timestamp);
     }
@@ -68,7 +69,7 @@ service cloud.firestore {
              data.id is string && data.id.size() > 0 && data.id.size() < 50 &&
              data.name is string && data.name.size() > 0 && data.name.size() < 50 &&
              data.color is string && data.color.size() < 50 &&
-             data.initial is string && data.initial.size() == 1 &&
+             data.initial is string && data.initial.size() > 0 && data.initial.size() < 20 &&
              data.members is list;
     }
 
@@ -101,34 +102,42 @@ service cloud.firestore {
       return !(field in request.resource.data) || request.resource.data[field] == resource.data[field];
     }
 
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
 
     // ===============================================================
     // Rules
     // ===============================================================
 
     match /workspaces/{workspaceId} {
-      allow read: if true;
-      allow create, update: if isValidWorkspace(request.resource.data);
-      allow delete: if true;
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() && isValidWorkspace(request.resource.data);
+      allow update: if isAdmin() && isValidWorkspace(request.resource.data);
+      allow delete: if isAdmin();
     }
 
     match /users/{userId} {
-      allow read: if true;
-      allow create, update: if isValidUser(request.resource.data);
-      allow delete: if true; // Admin can delete
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() && isValidUser(request.resource.data);
+      allow update: if isAuthenticated() && isValidUser(request.resource.data) && 
+                    (isAdmin() || (isOwner(userId) && request.resource.data.role == resource.data.role));
+      allow delete: if isAdmin();
     }
 
     match /channels/{channelId} {
-      allow read: if true;
-      allow create, update: if isValidChannel(request.resource.data);
-      allow delete: if true; // Admin can delete
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() && isValidChannel(request.resource.data);
+      allow update: if isAdmin() && isValidChannel(request.resource.data);
+      allow delete: if isAdmin();
     }
 
     match /messages/{messageId} {
-      allow read: if true;
-      allow create: if isValidMessage(request.resource.data);
-      allow update: if isValidMessage(request.resource.data) && isUnchanged('id') && isUnchanged('senderId');
-      allow delete: if true; // Admin can delete
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidMessage(request.resource.data);
+      allow update: if isAuthenticated() && isValidMessage(request.resource.data) && isUnchanged('id') && isUnchanged('senderId');
+      allow delete: if isAdmin() || (isAuthenticated() && resource.data.senderId == request.auth.uid);
     }
   }
 }

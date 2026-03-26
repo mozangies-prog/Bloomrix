@@ -21,7 +21,9 @@ import {
   increment
 } from 'firebase/firestore';
 import { auth, db } from './firebase';
+import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { User, Channel, Message, UserRole, ChannelType, Workspace } from './types';
+import { cn } from './lib/utils';
 import UserSelection from './components/UserSelection';
 import Sidebar from './components/Sidebar';
 import ChatPanel from './components/ChatPanel';
@@ -148,6 +150,20 @@ export default function App() {
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | undefined>();
   const [activeDMUserId, setActiveDMUserId] = useState<string | undefined>();
   const [activeView, setActiveView] = useState<'home' | 'dms' | 'activity' | 'files'>('home');
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [isAuthReady, setIsAuthReady] = useState(false);
+
+  // Firebase Auth initialization
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        signInAnonymously(auth).catch(err => console.error("Anonymous auth failed", err));
+      } else {
+        setIsAuthReady(true);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Presence management
   useEffect(() => {
@@ -180,6 +196,8 @@ export default function App() {
 
   // Load users and channels
   useEffect(() => {
+    if (!isAuthReady) return;
+
     const savedUser = localStorage.getItem('bloomrix_user');
     if (savedUser) {
       try {
@@ -281,11 +299,11 @@ export default function App() {
       unsubscribeChannels();
       unsubscribeWorkspaces();
     };
-  }, [activeChannelId, activeDMUserId, activeWorkspaceId]);
+  }, [activeChannelId, activeDMUserId, activeWorkspaceId, isAuthReady]);
 
   // Load messages for active channel or DM
   useEffect(() => {
-    if (!activeChannelId && !activeDMUserId) return;
+    if (!isAuthReady || (!activeChannelId && !activeDMUserId)) return;
 
     let q;
     if (activeChannelId) {
@@ -315,10 +333,10 @@ export default function App() {
       }
       
       setMessages(messagesData);
-    });
+    }, (err) => handleFirestoreError(err, OperationType.GET, 'messages'));
 
     return () => unsubscribeMessages();
-  }, [activeChannelId, activeDMUserId, currentUser]);
+  }, [activeChannelId, activeDMUserId, currentUser, isAuthReady]);
 
   // Socket events
   useEffect(() => {
@@ -467,11 +485,11 @@ export default function App() {
     });
   };
 
-  const handleCreateUser = async (name: string, username: string, password: string, avatar: string, role: UserRole) => {
+  const handleCreateUser = async (name: string, username: string, password: string, avatar: string, role: UserRole, gender?: 'male' | 'female') => {
     const id = Math.random().toString(36).substr(2, 9);
     const colors = ['bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-yellow-500', 'bg-purple-500', 'bg-pink-500', 'bg-indigo-500', 'bg-teal-500'];
     const color = colors[Math.floor(Math.random() * colors.length)];
-    const initial = name.charAt(0).toUpperCase();
+    const initial = name.trim().split(' ')[0];
 
     try {
       await setDoc(doc(db, 'users', id), { 
@@ -482,7 +500,8 @@ export default function App() {
         avatar: avatar || undefined, 
         color,
         initial,
-        role 
+        role,
+        gender
       });
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, 'users');
@@ -509,7 +528,7 @@ export default function App() {
   };
 
   const handleCreateChannel = async (name: string, type: ChannelType) => {
-    if (!currentUser || !activeWorkspaceId) return;
+    if (!currentUser || !activeWorkspaceId || currentUser.role !== 'admin') return;
     const id = Math.random().toString(36).substr(2, 9);
     try {
       await setDoc(doc(db, 'channels', id), { 
@@ -526,6 +545,7 @@ export default function App() {
   };
 
   const handleDeleteChannel = async (channelId: string) => {
+    if (!currentUser || currentUser.role !== 'admin') return;
     try {
       await deleteDoc(doc(db, 'channels', channelId));
     } catch (err) {
@@ -546,14 +566,15 @@ export default function App() {
   };
 
   const handleCreateWorkspace = async (name: string, color: string, initial: string) => {
-    if (!currentUser) return;
+    if (!currentUser || currentUser.role !== 'admin') return;
     const id = Math.random().toString(36).substr(2, 9);
+    const firstWordInitial = name.trim().split(' ')[0];
     try {
       await setDoc(doc(db, 'workspaces', id), { 
         id, 
         name, 
         color, 
-        initial, 
+        initial: firstWordInitial, 
         members: [currentUser.id] 
       });
     } catch (err) {
@@ -615,39 +636,64 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <div className="h-screen flex overflow-hidden bg-white">
-        <Sidebar 
-          currentUser={currentUser}
-          workspaces={filteredWorkspaces}
-          channels={filteredChannels}
-          users={users}
-          activeWorkspaceId={activeWorkspaceId}
-          activeChannelId={activeChannelId}
-          activeDMUserId={activeDMUserId}
-          activeView={activeView}
-          onSelectWorkspace={handleSelectWorkspace}
-          onSelectChannel={(id) => { 
-            setActiveChannelId(id); 
-            setActiveDMUserId(undefined); 
-            setActiveView('home');
-          }}
-          onSelectDM={(id) => { 
-            setActiveDMUserId(id); 
-            setActiveChannelId(undefined); 
-            setActiveView('home');
-          }}
-          onSelectView={(view) => {
-            setActiveView(view);
-            if (view !== 'home') {
-              setActiveChannelId(undefined);
-              setActiveDMUserId(undefined);
-            }
-          }}
-          onOpenAdmin={() => setIsAdminOpen(true)}
-          onLogout={handleLogout}
-        />
+      <div className="h-screen flex overflow-hidden bg-white relative">
+        {/* Mobile Sidebar Overlay */}
+        <AnimatePresence>
+          {isMobileSidebarOpen && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsMobileSidebarOpen(false)}
+              className="fixed inset-0 bg-black/50 z-40 md:hidden"
+            />
+          )}
+        </AnimatePresence>
+
+        <div className={cn(
+          "fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0",
+          isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
+        )}>
+          <Sidebar 
+            currentUser={currentUser}
+            workspaces={filteredWorkspaces}
+            channels={filteredChannels}
+            users={users}
+            activeWorkspaceId={activeWorkspaceId}
+            activeChannelId={activeChannelId}
+            activeDMUserId={activeDMUserId}
+            activeView={activeView}
+            onSelectWorkspace={handleSelectWorkspace}
+            onSelectChannel={(id) => { 
+              setActiveChannelId(id); 
+              setActiveDMUserId(undefined); 
+              setActiveView('home');
+              setIsMobileSidebarOpen(false);
+            }}
+            onSelectDM={(id) => { 
+              setActiveDMUserId(id); 
+              setActiveChannelId(undefined); 
+              setActiveView('home');
+              setIsMobileSidebarOpen(false);
+            }}
+            onSelectView={(view) => {
+              setActiveView(view);
+              if (view !== 'home') {
+                setActiveChannelId(undefined);
+                setActiveDMUserId(undefined);
+              }
+              setIsMobileSidebarOpen(false);
+            }}
+            onOpenAdmin={() => {
+              if (currentUser.role === 'admin') {
+                setIsAdminOpen(true);
+              }
+            }}
+            onLogout={handleLogout}
+          />
+        </div>
         
-        <div className="flex-1 flex flex-col min-w-0 bg-white">
+        <div className="flex-1 flex flex-col min-w-0 bg-white h-full overflow-hidden">
           {activeView === 'home' ? (
             <ChatPanel 
               currentUser={currentUser}
@@ -661,6 +707,7 @@ export default function App() {
               onTyping={handleTyping}
               onSearch={() => {}}
               onToggleStar={handleToggleStar}
+              onToggleSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
             />
           ) : activeView === 'dms' ? (
             <DMsView 

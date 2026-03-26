@@ -9,6 +9,7 @@ export interface User {
   color: string;
   initial: string;
   role: UserRole;
+  gender?: 'male' | 'female';
   isOnline?: boolean;
   lastSeen?: any; // Firestore Timestamp
   workspaces?: string[]; // IDs of workspaces the user is a member of
