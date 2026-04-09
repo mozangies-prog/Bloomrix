@@ -13,46 +13,8 @@ import AdminPanel from './components/AdminPanel';
 import DMsView from './components/DMsView';
 import ActivityView from './components/ActivityView';
 import FilesView from './components/FilesView';
-import { io, Socket } from 'socket.io-client';
+import { supabase } from './lib/supabase';
 import { motion, AnimatePresence } from 'motion/react';
-
-const socket: Socket = io();
-
-// Fallback data for testing phase when API might be unreachable (e.g. on Vercel)
-const FALLBACK_DB = {
-  users: [
-    {
-      id: "admin-1",
-      name: "System Admin",
-      username: "admin",
-      password: "admin123",
-      color: "bg-indigo-600",
-      initial: "S",
-      role: "admin",
-      isOnline: true
-    }
-  ],
-  workspaces: [
-    {
-      id: "default",
-      name: "General Workspace",
-      color: "bg-indigo-600",
-      initial: "G",
-      members: ["admin-1"]
-    }
-  ],
-  channels: [
-    {
-      id: "general",
-      name: "general",
-      type: "public",
-      createdBy: "admin-1",
-      workspaceId: "default",
-      members: ["admin-1"]
-    }
-  ],
-  messages: []
-};
 
 enum OperationType {
   CREATE = 'create',
@@ -64,7 +26,7 @@ enum OperationType {
 }
 
 function handleApiError(error: unknown, operationType: OperationType, path: string | null) {
-  console.error(`API Error: ${operationType} on ${path}`, error);
+  console.error(`Supabase Error: ${operationType} on ${path}`, error);
 }
 
 interface ErrorBoundaryProps {
@@ -95,12 +57,10 @@ class ErrorBoundary extends Component<any, any> {
   render() {
     if (this.state.hasError) {
       let message = "Something went wrong.";
-      try {
-        const parsed = JSON.parse(this.state.error.message);
-        if (parsed.error) message = `Firestore Error: ${parsed.error} during ${parsed.operationType} on ${parsed.path}`;
-      } catch (e) {
-        message = this.state.error.message || message;
+      if (this.state.error?.message) {
+        message = this.state.error.message;
       }
+      
       return (
         <div className="flex flex-col items-center justify-center h-screen bg-red-50 p-4 text-center">
           <h1 className="text-2xl font-bold text-red-600 mb-2">Oops!</h1>
@@ -132,64 +92,83 @@ export default function App() {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
 
   const fetchDB = useCallback(async () => {
     try {
-      const res = await fetch('/api/db');
-      const data = await res.json();
-      setUsers(data.users);
-      setChannels(data.channels);
-      setWorkspaces(data.workspaces);
-      setMessages(data.messages);
+      const [
+        { data: usersData },
+        { data: channelsData },
+        { data: workspacesData },
+        { data: messagesData }
+      ] = await Promise.all([
+        supabase.from('users').select('*'),
+        supabase.from('channels').select('*'),
+        supabase.from('workspaces').select('*'),
+        supabase.from('messages').select('*').order('timestamp', { ascending: true })
+      ]);
 
-      // Update current user if it exists
-      if (currentUser) {
-        const updatedUser = data.users.find((u: User) => u.id === currentUser.id);
-        if (updatedUser) {
-          setCurrentUser(updatedUser);
-        }
+      if (usersData) setUsers(usersData as User[]);
+      if (channelsData) setChannels(channelsData as Channel[]);
+      if (workspacesData) setWorkspaces(workspacesData as Workspace[]);
+      if (messagesData) setMessages(messagesData as Message[]);
+
+      if (workspacesData && workspacesData.length > 0 && !activeWorkspaceId) {
+        setActiveWorkspaceId(workspacesData[0].id);
       }
 
-      if (data.workspaces.length > 0 && !activeWorkspaceId) {
-        setActiveWorkspaceId(data.workspaces[0].id);
-      }
-
-      if (data.channels.length > 0 && !activeChannelId && !activeDMUserId) {
-        const workspaceChannel = data.channels.find((c: Channel) => c.workspaceId === (activeWorkspaceId || data.workspaces[0].id));
+      if (channelsData && channelsData.length > 0 && !activeChannelId && !activeDMUserId) {
+        const workspaceChannel = channelsData.find((c: Channel) => c.workspaceId === (activeWorkspaceId || workspacesData[0].id));
         if (workspaceChannel) {
           setActiveChannelId(workspaceChannel.id);
         } else {
-          setActiveChannelId(data.channels[0].id);
+          setActiveChannelId(channelsData[0].id);
         }
       }
     } catch (err) {
       handleApiError(err, OperationType.GET, 'db');
-      
-      // Use fallback data if API fails (common on serverless deployments like Vercel without correct setup)
-      if (users.length === 0) {
-        console.log('Using fallback database data');
-        setUsers(FALLBACK_DB.users as User[]);
-        setChannels(FALLBACK_DB.channels as Channel[]);
-        setWorkspaces(FALLBACK_DB.workspaces as Workspace[]);
-        setMessages(FALLBACK_DB.messages as Message[]);
-        
-        if (!activeWorkspaceId) setActiveWorkspaceId(FALLBACK_DB.workspaces[0].id);
-        if (!activeChannelId) setActiveChannelId(FALLBACK_DB.channels[0].id);
-      }
     }
-  }, [currentUser, activeWorkspaceId, activeChannelId, activeDMUserId, users.length]);
+  }, [activeWorkspaceId, activeChannelId, activeDMUserId]);
 
-  // Initial load
+  // Initial load & Auth check
   useEffect(() => {
-    const savedUser = localStorage.getItem('bloomrix_user');
-    if (savedUser) {
-      try {
-        setCurrentUser(JSON.parse(savedUser));
-      } catch (e) {
-        localStorage.removeItem('bloomrix_user');
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const { data: profile } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+        
+        if (profile) {
+          setCurrentUser(profile as User);
+        }
       }
-    }
+      setIsAuthLoading(false);
+    };
+
+    checkAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        const { data: profile } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+        
+        if (profile) {
+          setCurrentUser(profile as User);
+        }
+      } else {
+        setCurrentUser(null);
+      }
+    });
+
     fetchDB();
+
+    return () => subscription.unsubscribe();
   }, []);
 
   // Presence management
@@ -198,11 +177,10 @@ export default function App() {
 
     const setPresence = async (isOnline: boolean) => {
       try {
-        await fetch(`/api/users/${currentUser.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ isOnline, lastSeen: new Date().toISOString() })
-        });
+        await supabase
+          .from('users')
+          .update({ is_online: isOnline, last_seen: new Date().toISOString() })
+          .eq('id', currentUser.id);
       } catch (err) {
         handleApiError(err, OperationType.WRITE, 'users');
       }
@@ -218,36 +196,74 @@ export default function App() {
     };
   }, [currentUser?.id]);
 
-  // Socket events for real-time messages
+  // Real-time subscriptions
   useEffect(() => {
     if (!currentUser) return;
 
-    socket.emit('join_app', currentUser.id);
-
-    socket.on('receive_message', (data) => {
-      setMessages(prev => [...prev, data]);
-    });
-
-    socket.on('typing', (data) => {
-      const { userId, isTyping, channelId, receiverId } = data;
-      if (channelId === activeChannelId || receiverId === currentUser.id) {
-        setTypingUsers(prev => {
-          const user = users.find(u => u.id === userId);
-          if (!user) return prev;
-          if (isTyping) {
-            return prev.includes(user.name) ? prev : [...prev, user.name];
-          } else {
-            return prev.filter(name => name !== user.name);
-          }
+    const messageSubscription = supabase
+      .channel('public:messages')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
+        const newMessage = payload.new as Message;
+        setMessages(prev => {
+          if (prev.some(m => m.id === newMessage.id)) return prev;
+          return [...prev, newMessage];
         });
-      }
-    });
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, payload => {
+        const updatedMessage = payload.new as Message;
+        setMessages(prev => prev.map(m => m.id === updatedMessage.id ? updatedMessage : m));
+      })
+      .subscribe();
+
+    const userSubscription = supabase
+      .channel('public:users')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, payload => {
+        if (payload.eventType === 'INSERT') {
+          setUsers(prev => [...prev, payload.new as User]);
+        } else if (payload.eventType === 'UPDATE') {
+          setUsers(prev => prev.map(u => u.id === payload.new.id ? { ...u, ...payload.new } : u));
+          if (currentUser && payload.new.id === currentUser.id) {
+            setCurrentUser(prev => prev ? { ...prev, ...payload.new } : null);
+          }
+        } else if (payload.eventType === 'DELETE') {
+          setUsers(prev => prev.filter(u => u.id !== payload.old.id));
+        }
+      })
+      .subscribe();
+
+    const channelSubscription = supabase
+      .channel('public:channels')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'channels' }, payload => {
+        if (payload.eventType === 'INSERT') {
+          setChannels(prev => [...prev, payload.new as Channel]);
+        } else if (payload.eventType === 'UPDATE') {
+          setChannels(prev => prev.map(c => c.id === payload.new.id ? payload.new as Channel : c));
+        } else if (payload.eventType === 'DELETE') {
+          setChannels(prev => prev.filter(c => c.id !== payload.old.id));
+        }
+      })
+      .subscribe();
+
+    const workspaceSubscription = supabase
+      .channel('public:workspaces')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'workspaces' }, payload => {
+        if (payload.eventType === 'INSERT') {
+          setWorkspaces(prev => [...prev, payload.new as Workspace]);
+        } else if (payload.eventType === 'UPDATE') {
+          setWorkspaces(prev => prev.map(w => w.id === payload.new.id ? payload.new as Workspace : w));
+        } else if (payload.eventType === 'DELETE') {
+          setWorkspaces(prev => prev.filter(w => w.id !== payload.old.id));
+        }
+      })
+      .subscribe();
 
     return () => {
-      socket.off('receive_message');
-      socket.off('typing');
+      supabase.removeChannel(messageSubscription);
+      supabase.removeChannel(userSubscription);
+      supabase.removeChannel(channelSubscription);
+      supabase.removeChannel(workspaceSubscription);
     };
-  }, [currentUser, activeChannelId, activeDMUserId, users]);
+  }, [currentUser]);
 
   const handleSelectWorkspace = (workspaceId: string) => {
     setActiveWorkspaceId(workspaceId);
@@ -275,9 +291,9 @@ export default function App() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     setCurrentUser(null);
-    localStorage.removeItem('bloomrix_user');
   };
 
   const handleSendMessage = async (
@@ -288,12 +304,10 @@ export default function App() {
   ) => {
     if (!currentUser) return;
 
-    const messageId = Math.random().toString(36).substr(2, 9);
-    const messageData: Message = {
-      id: messageId,
+    const messageData: Partial<Message> = {
       senderId: currentUser.id,
       content,
-      timestamp: new Date().toISOString() as any,
+      timestamp: new Date().toISOString(),
       files: files || [],
       reactions: {},
       replyCount: 0,
@@ -305,29 +319,23 @@ export default function App() {
     else if (activeDMUserId) messageData.receiverId = activeDMUserId;
 
     try {
-      await fetch('/api/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(messageData)
-      });
+      const { data, error } = await supabase
+        .from('messages')
+        .insert([messageData])
+        .select()
+        .single();
       
+      if (error) throw error;
+
       if (threadId) {
         const parent = messages.find(m => m.id === threadId);
         if (parent) {
-          await fetch(`/api/messages/${threadId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ replyCount: (parent.replyCount || 0) + 1 })
-          });
+          await supabase
+            .from('messages')
+            .update({ replyCount: (parent.replyCount || 0) + 1 })
+            .eq('id', threadId);
         }
       }
-
-      setMessages(prev => [...prev, messageData]);
-      socket.emit('send_message', {
-        ...messageData,
-        channelId: activeChannelId,
-        receiverId: activeDMUserId
-      });
     } catch (err) {
       handleApiError(err, OperationType.WRITE, 'messages');
     }
@@ -349,55 +357,31 @@ export default function App() {
     }
 
     try {
-      await fetch(`/api/messages/${messageId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reactions })
-      });
-      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, reactions } : m));
-      socket.emit('message_reaction', { messageId, reactions });
+      await supabase
+        .from('messages')
+        .update({ reactions })
+        .eq('id', messageId);
     } catch (err) {
       handleApiError(err, OperationType.WRITE, 'messages');
     }
   };
 
   const handleTyping = (isTyping: boolean) => {
-    if (!currentUser) return;
-    socket.emit('typing', {
-      userId: currentUser.id,
-      isTyping,
-      channelId: activeChannelId,
-      receiverId: activeDMUserId
-    });
+    // Supabase Realtime typing indicators can be implemented with Broadcast
+    // For now, keeping it simple
   };
 
   const handleCreateUser = async (name: string, username: string, password: string, avatar: string, role: UserRole, gender?: 'male' | 'female') => {
-    const id = Math.random().toString(36).substr(2, 9);
-    const colors = ['bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-yellow-500', 'bg-purple-500', 'bg-pink-500', 'bg-indigo-500', 'bg-teal-500'];
-    const color = colors[Math.floor(Math.random() * colors.length)];
-    const initial = name.trim().split(' ')[0][0];
-
-    try {
-      const newUser = { id, name, username, password, avatar: avatar || undefined, color, initial, role, gender };
-      await fetch('/api/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newUser)
-      });
-      setUsers(prev => [...prev, newUser as User]);
-    } catch (err) {
-      handleApiError(err, OperationType.WRITE, 'users');
-    }
+    // Admin creating user via Auth is complex without Admin SDK
+    // Usually admin would invite or user would sign up
   };
 
   const handleUpdateUser = async (userId: string, updates: Partial<User>) => {
     try {
-      await fetch(`/api/users/${userId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updates)
-      });
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, ...updates } : u));
+      await supabase
+        .from('users')
+        .update(updates)
+        .eq('id', userId);
     } catch (err) {
       handleApiError(err, OperationType.WRITE, 'users');
     }
@@ -405,8 +389,7 @@ export default function App() {
 
   const handleDeleteUser = async (userId: string) => {
     try {
-      await fetch(`/api/users/${userId}`, { method: 'DELETE' });
-      setUsers(prev => prev.filter(u => u.id !== userId));
+      await supabase.from('users').delete().eq('id', userId);
     } catch (err) {
       handleApiError(err, OperationType.DELETE, 'users');
     }
@@ -414,15 +397,9 @@ export default function App() {
 
   const handleCreateChannel = async (name: string, type: ChannelType) => {
     if (!currentUser || !activeWorkspaceId || currentUser.role !== 'admin') return;
-    const id = Math.random().toString(36).substr(2, 9);
     try {
-      const newChannel = { id, name, type, createdBy: currentUser.id, workspaceId: activeWorkspaceId, members: [currentUser.id] };
-      await fetch('/api/channels', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newChannel)
-      });
-      setChannels(prev => [...prev, newChannel as Channel]);
+      const newChannel = { name, type, createdBy: currentUser.id, workspaceId: activeWorkspaceId, members: [currentUser.id] };
+      await supabase.from('channels').insert([newChannel]);
     } catch (err) {
       handleApiError(err, OperationType.WRITE, 'channels');
     }
@@ -430,22 +407,19 @@ export default function App() {
 
   const handleDeleteChannel = async (channelId: string) => {
     if (!currentUser || currentUser.role !== 'admin') return;
-    // Implement delete route if needed, for now just UI
-    setChannels(prev => prev.filter(c => c.id !== channelId));
+    try {
+      await supabase.from('channels').delete().eq('id', channelId);
+    } catch (err) {
+      handleApiError(err, OperationType.DELETE, 'channels');
+    }
   };
 
   const handleCreateWorkspace = async (name: string, color: string, initial: string) => {
     if (!currentUser || currentUser.role !== 'admin') return;
-    const id = Math.random().toString(36).substr(2, 9);
-    const firstWordInitial = name.trim().split(' ')[0][0];
+    const firstWordInitial = name.trim().split(' ')[0][0].toUpperCase();
     try {
-      const newWorkspace = { id, name, color, initial: firstWordInitial, members: [currentUser.id] };
-      await fetch('/api/workspaces', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newWorkspace)
-      });
-      setWorkspaces(prev => [...prev, newWorkspace as Workspace]);
+      const newWorkspace = { name, color, initial: firstWordInitial, members: [currentUser.id] };
+      await supabase.from('workspaces').insert([newWorkspace]);
     } catch (err) {
       handleApiError(err, OperationType.WRITE, 'workspaces');
     }
@@ -463,11 +437,8 @@ export default function App() {
     }
 
     try {
-      const endpoint = type === 'workspace' ? `/api/workspaces/${id}` : `/api/channels/${id}`;
-      // Note: Need to add PUT routes for workspaces/channels in server.ts if full CRUD is needed
-      // For now, we'll just update local state to keep it "live" for testing
-      if (type === 'workspace') setWorkspaces(prev => prev.map(w => w.id === id ? { ...w, members: newMembers } : w));
-      else setChannels(prev => prev.map(c => c.id === id ? { ...c, members: newMembers } : c));
+      const table = type === 'workspace' ? 'workspaces' : 'channels';
+      await supabase.from(table).update({ members: newMembers }).eq('id', id);
     } catch (err) {
       handleApiError(err, OperationType.WRITE, type);
     }
@@ -485,8 +456,7 @@ export default function App() {
 
   const handleDeleteWorkspace = async (workspaceId: string) => {
     try {
-      await fetch(`/api/workspaces/${workspaceId}`, { method: 'DELETE' });
-      setWorkspaces(prev => prev.filter(w => w.id !== workspaceId));
+      await supabase.from('workspaces').delete().eq('id', workspaceId);
       if (activeWorkspaceId === workspaceId) {
         setActiveWorkspaceId(undefined);
         setActiveChannelId(undefined);
@@ -496,8 +466,16 @@ export default function App() {
     }
   };
 
+  if (isAuthLoading) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-[#1A1D21]">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#4A154B]"></div>
+      </div>
+    );
+  }
+
   if (!currentUser) {
-    return <UserSelection users={users} onSelect={handleSelectUser} />;
+    return <UserSelection onSelect={setCurrentUser} />;
   }
 
   const filteredWorkspaces = currentUser?.role === 'admin' 

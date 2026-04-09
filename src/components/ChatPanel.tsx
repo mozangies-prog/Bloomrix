@@ -245,7 +245,7 @@ export default function ChatPanel({
                 <div className="text-gray-500 flex-shrink-0">{icon}</div>
                 <h2 className="text-base font-bold text-gray-900 truncate">{title}</h2>
                 {activeDMUser && (
-                  <div className={cn("w-2 h-2 rounded-full flex-shrink-0", activeDMUser.isOnline ? "bg-green-500" : "bg-gray-500")} />
+                  <div className={cn("w-2 h-2 rounded-full flex-shrink-0", activeDMUser.is_online ? "bg-green-500" : "bg-gray-500")} />
                 )}
                 <ChevronDown className="w-4 h-4 text-gray-500 flex-shrink-0" />
               </button>
@@ -619,7 +619,7 @@ function MessageItem({
                   {sender?.initial || '?'}
                 </div>
               )}
-              {sender?.isOnline && (
+              {sender?.is_online && (
                 <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white" />
               )}
             </div>

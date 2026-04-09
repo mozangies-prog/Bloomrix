@@ -3,15 +3,14 @@ export type UserRole = 'admin' | 'user';
 export interface User {
   id: string;
   name: string;
-  username?: string;
-  password?: string;
+  email: string;
   avatar?: string;
   color: string;
   initial: string;
   role: UserRole;
   gender?: 'male' | 'female';
-  isOnline?: boolean;
-  lastSeen?: any; // Firestore Timestamp
+  is_online?: boolean;
+  last_seen?: string;
   workspaces?: string[]; // IDs of workspaces the user is a member of
   starredChannels?: string[];
   starredDMs?: string[];
@@ -42,7 +41,7 @@ export interface Message {
   content: string;
   channelId?: string;
   receiverId?: string;
-  timestamp: any; // Firestore Timestamp
+  timestamp: string;
   files?: {
     url: string;
     name: string;

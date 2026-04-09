@@ -217,79 +217,12 @@ export default function AdminPanel({
           </AnimatePresence>
 
           {activeTab === 'users' ? (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* Create User Form */}
-              <div className="lg:col-span-1 space-y-4">
-                <h3 className="text-lg font-bold text-gray-900 flex items-center">
-                  <UserPlus className="w-5 h-5 mr-2 text-[#4A154B]" />
-                  Add New User
-                </h3>
-                <form onSubmit={handleCreateUser} className="space-y-4 p-4 bg-gray-50 rounded-xl border border-gray-100">
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Full Name</label>
-                    <input 
-                      type="text" 
-                      value={newUserName}
-                      onChange={(e) => setNewUserName(e.target.value)}
-                      placeholder="e.g. John Doe"
-                      className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#4A154B] focus:border-transparent transition-all"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Username</label>
-                    <input 
-                      type="text" 
-                      value={newUserUsername}
-                      onChange={(e) => setNewUserUsername(e.target.value)}
-                      placeholder="e.g. jdoe"
-                      className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#4A154B] focus:border-transparent transition-all"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Password</label>
-                    <input 
-                      type="password" 
-                      value={newUserPassword}
-                      onChange={(e) => setNewUserPassword(e.target.value)}
-                      placeholder="••••••••"
-                      className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#4A154B] focus:border-transparent transition-all"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Role</label>
-                    <select 
-                      value={newUserRole}
-                      onChange={(e) => setNewUserRole(e.target.value as UserRole)}
-                      className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#4A154B] focus:border-transparent transition-all"
-                    >
-                      <option value="user">Standard User</option>
-                      <option value="admin">Administrator</option>
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Gender</label>
-                    <select 
-                      value={newUserGender}
-                      onChange={(e) => setNewUserGender(e.target.value as 'male' | 'female')}
-                      className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#4A154B] focus:border-transparent transition-all"
-                    >
-                      <option value="male">Male</option>
-                      <option value="female">Female</option>
-                    </select>
-                  </div>
-                  <button 
-                    type="submit"
-                    className="w-full py-2 bg-[#4A154B] text-white font-bold rounded-lg hover:bg-[#350D36] transition-colors shadow-md"
-                  >
-                    Create User
-                  </button>
-                </form>
-              </div>
-
+            <div className="space-y-4">
               {/* Users List */}
-              <div className="lg:col-span-2 space-y-4">
+              <div className="space-y-4">
                 <h3 className="text-lg font-bold text-gray-900 flex items-center justify-between">
                   <span>Current Users</span>
+                  <span className="text-xs font-normal text-gray-500">Users must sign up themselves to be added to the system</span>
                 </h3>
                 <div className="border border-gray-100 rounded-xl overflow-x-auto shadow-sm">
                   <table className="w-full text-left min-w-[600px]">
@@ -297,8 +230,7 @@ export default function AdminPanel({
                       <tr>
                         <th className="px-6 py-3">User</th>
                         <th className="px-6 py-3">ID</th>
-                        <th className="px-6 py-3">Username</th>
-                        <th className="px-6 py-3">Password</th>
+                        <th className="px-6 py-3">Email</th>
                         <th className="px-6 py-3">Role</th>
                         <th className="px-6 py-3">Gender</th>
                         <th className="px-6 py-3 text-right">Actions</th>
@@ -347,20 +279,7 @@ export default function AdminPanel({
                             <span className="text-xs text-gray-400 font-mono">{user.id}</span>
                           </td>
                           <td className="px-6 py-4">
-                            <input 
-                              type="text" 
-                              className="text-sm text-gray-600 bg-transparent border border-gray-100 rounded px-1 focus:ring-1 focus:ring-purple-200 w-24"
-                              defaultValue={user.username}
-                              onBlur={(e) => onUpdateUser(user.id, { username: e.target.value })}
-                            />
-                          </td>
-                          <td className="px-6 py-4">
-                            <input 
-                              type="text" 
-                              className="text-sm text-gray-600 bg-transparent border border-gray-100 rounded px-1 focus:ring-1 focus:ring-purple-200 w-24"
-                              defaultValue={user.password}
-                              onBlur={(e) => onUpdateUser(user.id, { password: e.target.value })}
-                            />
+                            <span className="text-sm text-gray-600">{(user as any).email}</span>
                           </td>
                           <td className="px-6 py-4">
                             <span className={cn(
