@@ -82,19 +82,6 @@ export default function UserSelection({ users, onSelect }: UserSelectionProps) {
               Sign In
             </button>
           </form>
-
-          <div className="mt-6 pt-6 border-t border-[#303236]">
-            <button 
-              onClick={() => {
-                const admin = users.find(u => u.username === 'admin');
-                if (admin) onSelect(admin);
-              }}
-              className="w-full py-3 bg-[#1A1D21] text-gray-400 font-medium rounded-xl border border-[#303236] hover:bg-[#222529] transition-all flex items-center justify-center space-x-2 active:scale-[0.98]"
-            >
-              <ShieldCheck className="w-5 h-5 text-indigo-500" />
-              <span>Quick Login as Admin</span>
-            </button>
-          </div>
         </div>
 
         <div className="pt-8">

@@ -18,6 +18,42 @@ import { motion, AnimatePresence } from 'motion/react';
 
 const socket: Socket = io();
 
+// Fallback data for testing phase when API might be unreachable (e.g. on Vercel)
+const FALLBACK_DB = {
+  users: [
+    {
+      id: "admin-1",
+      name: "System Admin",
+      username: "admin",
+      password: "admin123",
+      color: "bg-indigo-600",
+      initial: "S",
+      role: "admin",
+      isOnline: true
+    }
+  ],
+  workspaces: [
+    {
+      id: "default",
+      name: "General Workspace",
+      color: "bg-indigo-600",
+      initial: "G",
+      members: ["admin-1"]
+    }
+  ],
+  channels: [
+    {
+      id: "general",
+      name: "general",
+      type: "public",
+      createdBy: "admin-1",
+      workspaceId: "default",
+      members: ["admin-1"]
+    }
+  ],
+  messages: []
+};
+
 enum OperationType {
   CREATE = 'create',
   UPDATE = 'update',
@@ -128,8 +164,20 @@ export default function App() {
       }
     } catch (err) {
       handleApiError(err, OperationType.GET, 'db');
+      
+      // Use fallback data if API fails (common on serverless deployments like Vercel without correct setup)
+      if (users.length === 0) {
+        console.log('Using fallback database data');
+        setUsers(FALLBACK_DB.users as User[]);
+        setChannels(FALLBACK_DB.channels as Channel[]);
+        setWorkspaces(FALLBACK_DB.workspaces as Workspace[]);
+        setMessages(FALLBACK_DB.messages as Message[]);
+        
+        if (!activeWorkspaceId) setActiveWorkspaceId(FALLBACK_DB.workspaces[0].id);
+        if (!activeChannelId) setActiveChannelId(FALLBACK_DB.channels[0].id);
+      }
     }
-  }, [currentUser, activeWorkspaceId, activeChannelId, activeDMUserId]);
+  }, [currentUser, activeWorkspaceId, activeChannelId, activeDMUserId, users.length]);
 
   // Initial load
   useEffect(() => {
