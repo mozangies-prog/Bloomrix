@@ -1,0 +1,44 @@
+{
+  "users": [
+    {
+      "id": "admin-1",
+      "name": "System Admin",
+      "username": "admin",
+      "password": "admin123",
+      "color": "bg-indigo-600",
+      "initial": "S",
+      "role": "admin",
+      "isOnline": true
+    },
+    {
+      "id": "user-1",
+      "name": "John Doe",
+      "username": "john",
+      "password": "password123",
+      "color": "bg-blue-500",
+      "initial": "J",
+      "role": "user",
+      "isOnline": false
+    }
+  ],
+  "workspaces": [
+    {
+      "id": "default",
+      "name": "General Workspace",
+      "color": "bg-indigo-600",
+      "initial": "G",
+      "members": ["admin-1", "user-1"]
+    }
+  ],
+  "channels": [
+    {
+      "id": "general",
+      "name": "general",
+      "type": "public",
+      "createdBy": "admin-1",
+      "workspaceId": "default",
+      "members": ["admin-1", "user-1"]
+    }
+  ],
+  "messages": []
+}
