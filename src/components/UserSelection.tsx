@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { User } from '../types';
 import { cn } from '../lib/utils';
 import { ShieldCheck, Lock, User as UserIcon, AlertCircle, Mail, Loader2 } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { supabase, isConfigured } from '../lib/supabase';
 
 interface UserSelectionProps {
   onSelect: (user: User) => void;
@@ -19,6 +19,12 @@ export default function UserSelection({ onSelect }: UserSelectionProps) {
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (!isConfigured) {
+      setError('Configuration Missing: Please add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in the Settings menu (top right).');
+      return;
+    }
+
     setIsLoading(true);
 
     // Map 'admin' username to a valid email format for Supabase Auth
