@@ -27,6 +27,14 @@ export default function FilesView({
 }: FilesViewProps) {
   const activeWorkspace = workspaces.find(w => w.id === activeWorkspaceId);
 
+  const parseTimestamp = (ts: any) => {
+    if (!ts) return new Date();
+    if (typeof ts.toDate === 'function') return ts.toDate();
+    if (ts.seconds) return new Date(ts.seconds * 1000);
+    const d = new Date(ts);
+    return isNaN(d.getTime()) ? new Date() : d;
+  };
+
   // Filter messages with files and in the current workspace
   const files = messages
     .filter(msg => {
@@ -45,8 +53,8 @@ export default function FilesView({
     })
     .flatMap(msg => msg.files!.map(file => ({ ...file, msg }))) // Flatten to show each file
     .sort((a, b) => {
-      const aDate = a.msg.timestamp?.toDate ? a.msg.timestamp.toDate().getTime() : 0;
-      const bDate = b.msg.timestamp?.toDate ? b.msg.timestamp.toDate().getTime() : 0;
+      const aDate = parseTimestamp(a.msg.timestamp).getTime();
+      const bDate = parseTimestamp(b.msg.timestamp).getTime();
       return bDate - aDate;
     });
 
@@ -68,7 +76,7 @@ export default function FilesView({
               const msg = file.msg;
               const sender = users.find(u => u.id === msg.senderId);
               const channel = channels.find(c => c.id === msg.channelId);
-              const date = msg.timestamp?.toDate ? msg.timestamp.toDate() : new Date();
+              const date = parseTimestamp(msg.timestamp);
 
               return (
                 <div 

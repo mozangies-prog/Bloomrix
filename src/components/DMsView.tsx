@@ -25,6 +25,14 @@ export default function DMsView({
 }: DMsViewProps) {
   const activeWorkspace = workspaces.find(w => w.id === activeWorkspaceId);
 
+  const parseTimestamp = (ts: any) => {
+    if (!ts) return new Date();
+    if (typeof ts.toDate === 'function') return ts.toDate();
+    if (ts.seconds) return new Date(ts.seconds * 1000);
+    const d = new Date(ts);
+    return isNaN(d.getTime()) ? new Date() : d;
+  };
+
   // Filter other users by workspace membership
   const otherUsers = users.filter(u => 
     u.id !== currentUser.id && 
@@ -39,15 +47,15 @@ export default function DMsView({
         (msg.senderId === user.id && msg.receiverId === currentUser.id)
       ))
       .sort((a, b) => {
-        const aDate = a.timestamp?.toDate ? a.timestamp.toDate().getTime() : 0;
-        const bDate = b.timestamp?.toDate ? b.timestamp.toDate().getTime() : 0;
+        const aDate = parseTimestamp(a.timestamp).getTime();
+        const bDate = parseTimestamp(b.timestamp).getTime();
         return bDate - aDate;
       })[0];
     
     return { user, lastMsg };
   }).sort((a, b) => {
-    const aDate = a.lastMsg?.timestamp?.toDate ? a.lastMsg.timestamp.toDate().getTime() : 0;
-    const bDate = b.lastMsg?.timestamp?.toDate ? b.lastMsg.timestamp.toDate().getTime() : 0;
+    const aDate = a.lastMsg ? parseTimestamp(a.lastMsg.timestamp).getTime() : 0;
+    const bDate = b.lastMsg ? parseTimestamp(b.lastMsg.timestamp).getTime() : 0;
     return bDate - aDate;
   });
 
@@ -73,7 +81,7 @@ export default function DMsView({
 
       <div className="flex-1 overflow-y-auto">
         {userLastMessages.map(({ user, lastMsg }) => {
-          const date = lastMsg?.timestamp?.toDate ? lastMsg.timestamp.toDate() : null;
+          const date = lastMsg ? parseTimestamp(lastMsg.timestamp) : null;
 
           return (
             <div 

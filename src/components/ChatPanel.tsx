@@ -276,9 +276,17 @@ export default function ChatPanel({
               </div>
             ) : (
               filteredMessages.map((msg, idx) => {
+                const parseTimestamp = (ts: any) => {
+                  if (!ts) return new Date();
+                  if (typeof ts.toDate === 'function') return ts.toDate();
+                  if (ts.seconds) return new Date(ts.seconds * 1000);
+                  const d = new Date(ts);
+                  return isNaN(d.getTime()) ? new Date() : d;
+                };
+
                 const showAvatar = idx === 0 || filteredMessages[idx - 1].senderId !== msg.senderId;
-                const msgDate = msg.timestamp?.toDate ? msg.timestamp.toDate() : (msg.timestamp ? new Date(msg.timestamp.seconds * 1000) : new Date());
-                const prevMsgDate = filteredMessages[idx-1]?.timestamp?.toDate ? filteredMessages[idx-1].timestamp.toDate() : null;
+                const msgDate = parseTimestamp(msg.timestamp);
+                const prevMsgDate = idx > 0 ? parseTimestamp(filteredMessages[idx-1].timestamp) : null;
                 const showDateHeader = idx === 0 || (prevMsgDate && format(prevMsgDate, 'yyyy-MM-dd') !== format(msgDate, 'yyyy-MM-dd'));
 
                 return (
@@ -459,31 +467,53 @@ export default function ChatPanel({
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              <MessageItem 
-                msg={parentMessage}
-                showAvatar={true}
-                showDateHeader={false}
-                msgDate={parentMessage.timestamp?.toDate ? parentMessage.timestamp.toDate() : (parentMessage.timestamp ? new Date(parentMessage.timestamp.seconds * 1000) : new Date())}
-                users={users}
-                currentUser={currentUser}
-                isThreadParent={true}
-              />
+              {(() => {
+                const parseTimestamp = (ts: any) => {
+                  if (!ts) return new Date();
+                  if (typeof ts.toDate === 'function') return ts.toDate();
+                  if (ts.seconds) return new Date(ts.seconds * 1000);
+                  const d = new Date(ts);
+                  return isNaN(d.getTime()) ? new Date() : d;
+                };
+                
+                return (
+                  <MessageItem 
+                    msg={parentMessage}
+                    showAvatar={true}
+                    showDateHeader={false}
+                    msgDate={parseTimestamp(parentMessage.timestamp)}
+                    users={users}
+                    currentUser={currentUser}
+                    isThreadParent={true}
+                  />
+                );
+              })()}
               <div className="flex items-center space-x-2">
                 <div className="flex-1 h-[1px] bg-gray-200" />
                 <span className="text-xs text-gray-500 font-medium">{threadMessages.length} replies</span>
                 <div className="flex-1 h-[1px] bg-gray-200" />
               </div>
-              {threadMessages.map((msg, idx) => (
-                <MessageItem 
-                  key={msg.id}
-                  msg={msg}
-                  showAvatar={idx === 0 || threadMessages[idx - 1].senderId !== msg.senderId}
-                  showDateHeader={false}
-                  msgDate={msg.timestamp?.toDate ? msg.timestamp.toDate() : (msg.timestamp ? new Date(msg.timestamp.seconds * 1000) : new Date())}
-                  users={users}
-                  currentUser={currentUser}
-                />
-              ))}
+              {threadMessages.map((msg, idx) => {
+                const parseTimestamp = (ts: any) => {
+                  if (!ts) return new Date();
+                  if (typeof ts.toDate === 'function') return ts.toDate();
+                  if (ts.seconds) return new Date(ts.seconds * 1000);
+                  const d = new Date(ts);
+                  return isNaN(d.getTime()) ? new Date() : d;
+                };
+
+                return (
+                  <MessageItem 
+                    key={msg.id}
+                    msg={msg}
+                    showAvatar={idx === 0 || threadMessages[idx - 1].senderId !== msg.senderId}
+                    showDateHeader={false}
+                    msgDate={parseTimestamp(msg.timestamp)}
+                    users={users}
+                    currentUser={currentUser}
+                  />
+                );
+              })}
               <div ref={threadEndRef} />
             </div>
             <div className="p-4 border-t border-gray-200">

@@ -27,6 +27,14 @@ export default function ActivityView({
 }: ActivityViewProps) {
   const activeWorkspace = workspaces.find(w => w.id === activeWorkspaceId);
 
+  const parseTimestamp = (ts: any) => {
+    if (!ts) return new Date();
+    if (typeof ts.toDate === 'function') return ts.toDate();
+    if (ts.seconds) return new Date(ts.seconds * 1000);
+    const d = new Date(ts);
+    return isNaN(d.getTime()) ? new Date() : d;
+  };
+
   // Filter messages where user is mentioned or it's a DM to them, and it's in the current workspace
   const activity = messages
     .filter(msg => {
@@ -45,8 +53,8 @@ export default function ActivityView({
       return isMentioned || isDM;
     })
     .sort((a, b) => {
-      const aDate = a.timestamp?.toDate ? a.timestamp.toDate().getTime() : 0;
-      const bDate = b.timestamp?.toDate ? b.timestamp.toDate().getTime() : 0;
+      const aDate = parseTimestamp(a.timestamp).getTime();
+      const bDate = parseTimestamp(b.timestamp).getTime();
       return bDate - aDate;
     });
 
@@ -66,7 +74,7 @@ export default function ActivityView({
           activity.map(msg => {
             const sender = users.find(u => u.id === msg.senderId);
             const channel = channels.find(c => c.id === msg.channelId);
-            const date = msg.timestamp?.toDate ? msg.timestamp.toDate() : new Date();
+            const date = parseTimestamp(msg.timestamp);
 
             return (
               <div 
