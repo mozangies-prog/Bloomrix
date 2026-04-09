@@ -21,11 +21,14 @@ export default function UserSelection({ onSelect }: UserSelectionProps) {
     setError('');
     setIsLoading(true);
 
+    // Map 'admin' username to a valid email format for Supabase Auth
+    const loginEmail = email.toLowerCase() === 'admin' ? 'admin@bloomrix.com' : email;
+
     try {
       if (isSignUp) {
         // Sign Up
         const { data: authData, error: authError } = await supabase.auth.signUp({
-          email,
+          email: loginEmail,
           password,
         });
 
@@ -42,11 +45,11 @@ export default function UserSelection({ onSelect }: UserSelectionProps) {
           .insert([
             {
               id: authData.user.id,
-              name: fullName,
-              email: email,
+              name: fullName || (email.toLowerCase() === 'admin' ? 'Administrator' : 'User'),
+              email: loginEmail,
               color,
-              initial,
-              role: 'user', // Default role
+              initial: initial || 'A',
+              role: email.toLowerCase() === 'admin' ? 'admin' : 'user',
             }
           ])
           .select()
@@ -57,7 +60,7 @@ export default function UserSelection({ onSelect }: UserSelectionProps) {
       } else {
         // Sign In
         const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-          email,
+          email: loginEmail,
           password,
         });
 
@@ -79,6 +82,12 @@ export default function UserSelection({ onSelect }: UserSelectionProps) {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleQuickAdmin = () => {
+    setEmail('admin');
+    setPassword('admin123');
+    setIsSignUp(false);
   };
 
   return (
@@ -119,14 +128,14 @@ export default function UserSelection({ onSelect }: UserSelectionProps) {
               )}
 
               <div className="space-y-2 text-left">
-                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Email Address</label>
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Email or Username</label>
                 <div className="relative">
                   <Mail className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
                   <input 
-                    type="email" 
+                    type="text" 
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="name@company.com"
+                    placeholder="admin or name@company.com"
                     className="w-full pl-10 pr-4 py-3 bg-[#1A1D21] border border-[#303236] rounded-xl text-white focus:ring-2 focus:ring-[#4A154B] focus:border-transparent transition-all outline-none"
                     required
                   />
@@ -162,13 +171,23 @@ export default function UserSelection({ onSelect }: UserSelectionProps) {
             </button>
           </form>
 
-          <div className="mt-6 pt-6 border-t border-[#303236]">
+          <div className="mt-6 pt-6 border-t border-[#303236] flex flex-col space-y-4">
             <button 
               onClick={() => setIsSignUp(!isSignUp)}
               className="text-sm text-[#4A154B] hover:text-[#350D36] font-semibold transition-colors"
             >
               {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
             </button>
+            
+            {!isSignUp && (
+              <button 
+                onClick={handleQuickAdmin}
+                className="text-xs text-gray-500 hover:text-gray-400 transition-colors flex items-center justify-center"
+              >
+                <ShieldCheck className="w-3 h-3 mr-1" />
+                Quick Admin Login (Testing)
+              </button>
+            )}
           </div>
         </div>
 
