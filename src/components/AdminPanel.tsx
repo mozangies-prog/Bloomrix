@@ -217,12 +217,68 @@ export default function AdminPanel({
           </AnimatePresence>
 
           {activeTab === 'users' ? (
-            <div className="space-y-4">
+            <div className="space-y-8">
+              {/* Add User Form */}
+              <div className="bg-gray-50/50 p-6 rounded-2xl border border-gray-100 space-y-4">
+                <h3 className="text-lg font-bold text-gray-900 flex items-center">
+                  <UserPlus className="w-5 h-5 mr-2 text-[#4A154B]" />
+                  Add New User
+                </h3>
+                <form onSubmit={handleCreateUser} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Full Name</label>
+                    <input 
+                      type="text" 
+                      value={newUserName}
+                      onChange={(e) => setNewUserName(e.target.value)}
+                      placeholder="John Doe"
+                      className="w-full px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-purple-200 outline-none transition-all"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Email</label>
+                    <input 
+                      type="email" 
+                      value={newUserUsername}
+                      onChange={(e) => setNewUserUsername(e.target.value)}
+                      placeholder="john@example.com"
+                      className="w-full px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-purple-200 outline-none transition-all"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Password</label>
+                    <input 
+                      type="password" 
+                      value={newUserPassword}
+                      onChange={(e) => setNewUserPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-purple-200 outline-none transition-all"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Role</label>
+                    <select 
+                      value={newUserRole}
+                      onChange={(e) => setNewUserRole(e.target.value as UserRole)}
+                      className="w-full px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-purple-200 outline-none transition-all"
+                    >
+                      <option value="user">User</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  </div>
+                  <button 
+                    type="submit"
+                    className="px-6 py-2 bg-[#4A154B] text-white font-bold rounded-xl hover:bg-[#350D36] transition-all shadow-md active:scale-95 text-sm"
+                  >
+                    Create User
+                  </button>
+                </form>
+              </div>
+
               {/* Users List */}
               <div className="space-y-4">
                 <h3 className="text-lg font-bold text-gray-900 flex items-center justify-between">
                   <span>Current Users</span>
-                  <span className="text-xs font-normal text-gray-500">Users must sign up themselves to be added to the system</span>
                 </h3>
                 <div className="border border-gray-100 rounded-xl overflow-x-auto shadow-sm">
                   <table className="w-full text-left min-w-[600px]">

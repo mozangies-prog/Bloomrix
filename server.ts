@@ -6,9 +6,24 @@ import { createServer as createViteServer } from 'vite';
 import multer from 'multer';
 import cors from 'cors';
 import fs from 'fs';
+import { createClient } from '@supabase/supabase-js';
 
 async function startServer() {
   const app = express();
+  
+  // Initialize Supabase Admin Client
+  const supabaseUrl = process.env.VITE_SUPABASE_URL;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  
+  const supabaseAdmin = (supabaseUrl && supabaseServiceKey) 
+    ? createClient(supabaseUrl, supabaseServiceKey, {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      })
+    : null;
+
   const httpServer = createServer(app);
   const io = new Server(httpServer, {
     cors: {
@@ -143,6 +158,119 @@ async function startServer() {
     db.workspaces = db.workspaces.filter((w: any) => w.id !== req.params.id);
     writeDB(db);
     res.json({ success: true });
+  });
+
+  // Simplified Login with Admin Bootstrapping
+  app.post('/api/login', async (req, res) => {
+    const { email, password } = req.body;
+    const loginEmail = email.toLowerCase() === 'admin' ? 'admin@bloomrix.com' : email;
+
+    if (!supabaseAdmin) {
+      return res.status(500).json({ error: 'Supabase Admin SDK not configured.' });
+    }
+
+    try {
+      // 1. Check if it's the hardcoded admin
+      if (email.toLowerCase() === 'admin' && password === 'admin123') {
+        // Ensure admin user exists in Auth
+        const { data: { users: existingUsers } } = await supabaseAdmin.auth.admin.listUsers();
+        let adminUser = existingUsers.find(u => u.email === 'admin@bloomrix.com');
+
+        if (!adminUser) {
+          const { data: newAuth, error: createError } = await supabaseAdmin.auth.admin.createUser({
+            email: 'admin@bloomrix.com',
+            password: 'admin123',
+            email_confirm: true
+          });
+          if (createError) throw createError;
+          adminUser = newAuth.user;
+        }
+
+        // Ensure admin profile exists in 'users' table
+        const { data: profile } = await supabaseAdmin.from('users').select('*').eq('id', adminUser!.id).single();
+        if (!profile) {
+          await supabaseAdmin.from('users').insert([{
+            id: adminUser!.id,
+            name: 'Administrator',
+            email: 'admin@bloomrix.com',
+            role: 'admin',
+            color: 'bg-purple-600',
+            initial: 'A'
+          }]);
+        }
+      }
+
+      // 2. Perform standard sign in
+      // We use the admin client to bypass email confirmation checks if needed, 
+      // but for standard users we just check their existence and profile.
+      const { data: authData, error: authError } = await supabaseAdmin.auth.signInWithPassword({
+        email: loginEmail,
+        password
+      });
+
+      if (authError) throw authError;
+
+      const { data: userProfile, error: profileError } = await supabaseAdmin
+        .from('users')
+        .select('*')
+        .eq('id', authData.user.id)
+        .single();
+
+      if (profileError) throw profileError;
+
+      res.json({ user: userProfile });
+    } catch (err: any) {
+      console.error('Login Error:', err);
+      res.status(401).json({ error: err.message });
+    }
+  });
+
+  // Admin: Create User with Auth
+  app.post('/api/admin/create-user', async (req, res) => {
+    if (!supabaseAdmin) {
+      return res.status(500).json({ error: 'Supabase Admin SDK not configured. Please add SUPABASE_SERVICE_ROLE_KEY to your environment variables.' });
+    }
+
+    const { email, password, name, avatar, role, gender } = req.body;
+
+    try {
+      // 1. Create user in Supabase Auth
+      const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true
+      });
+
+      if (authError) throw authError;
+      if (!authData.user) throw new Error('Failed to create auth user');
+
+      // 2. Create user profile in 'users' table
+      const colors = ['bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-yellow-500', 'bg-purple-500', 'bg-pink-500', 'bg-indigo-500', 'bg-teal-500'];
+      const color = colors[Math.floor(Math.random() * colors.length)];
+      const initial = name.trim().split(' ')[0][0].toUpperCase();
+
+      const { error: profileError } = await supabaseAdmin
+        .from('users')
+        .insert([
+          {
+            id: authData.user.id,
+            name,
+            email,
+            color,
+            initial,
+            role: role || 'user',
+            avatar,
+            gender
+          }
+        ]);
+
+      if (profileError) throw profileError;
+
+      res.json({ success: true, user: authData.user });
+    } catch (err: any) {
+      console.error('Admin Create User Error:', err);
+      res.status(400).json({ error: err.message });
+    }
   });
 
   app.post('/api/messages', (req, res) => {

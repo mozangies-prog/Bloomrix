@@ -372,8 +372,34 @@ export default function App() {
   };
 
   const handleCreateUser = async (name: string, username: string, password: string, avatar: string, role: UserRole, gender?: 'male' | 'female') => {
-    // Admin creating user via Auth is complex without Admin SDK
-    // Usually admin would invite or user would sign up
+    if (!currentUser || currentUser.role !== 'admin') return;
+
+    try {
+      const response = await fetch('/api/admin/create-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: username,
+          password,
+          name,
+          avatar,
+          role,
+          gender
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create user');
+      }
+
+      // User created successfully, the real-time subscription will update the list
+    } catch (err) {
+      console.error('Error creating user:', err);
+      alert(err instanceof Error ? err.message : 'Failed to create user');
+    }
   };
 
   const handleUpdateUser = async (userId: string, updates: Partial<User>) => {
