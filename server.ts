@@ -184,6 +184,9 @@ async function startServer() {
           });
           if (createError) throw createError;
           adminUser = newAuth.user;
+        } else if (!adminUser.email_confirmed_at) {
+          // Force confirm if existing admin is not confirmed
+          await supabaseAdmin.auth.admin.updateUserById(adminUser.id, { email_confirm: true });
         }
 
         // Ensure admin profile exists in 'users' table
@@ -201,14 +204,30 @@ async function startServer() {
       }
 
       // 2. Perform standard sign in
-      // We use the admin client to bypass email confirmation checks if needed, 
-      // but for standard users we just check their existence and profile.
-      const { data: authData, error: authError } = await supabaseAdmin.auth.signInWithPassword({
+      let { data: authData, error: authError } = await supabaseAdmin.auth.signInWithPassword({
         email: loginEmail,
         password
       });
 
+      // 3. Handle "Email not confirmed" error by auto-confirming via Admin SDK
+      if (authError && authError.message.includes('Email not confirmed')) {
+        const { data: { users: allUsers } } = await supabaseAdmin.auth.admin.listUsers();
+        const userToConfirm = allUsers.find(u => u.email === loginEmail);
+        
+        if (userToConfirm) {
+          await supabaseAdmin.auth.admin.updateUserById(userToConfirm.id, { email_confirm: true });
+          // Retry sign in after confirmation
+          const retry = await supabaseAdmin.auth.signInWithPassword({
+            email: loginEmail,
+            password
+          });
+          authData = retry.data;
+          authError = retry.error;
+        }
+      }
+
       if (authError) throw authError;
+      if (!authData.user) throw new Error('Login failed');
 
       const { data: userProfile, error: profileError } = await supabaseAdmin
         .from('users')
