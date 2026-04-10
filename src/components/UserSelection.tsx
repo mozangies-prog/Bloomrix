@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { User } from '../types';
 import { cn } from '../lib/utils';
 import { ShieldCheck, Lock, User as UserIcon, AlertCircle, Mail, Loader2 } from 'lucide-react';
-import { supabase, isConfigured } from '../lib/supabase';
+import { supabase, isConfigured, configStatus } from '../lib/supabase';
 
 interface UserSelectionProps {
   onSelect: (user: User) => void;
@@ -21,7 +21,11 @@ export default function UserSelection({ onSelect }: UserSelectionProps) {
     setError('');
 
     if (!isConfigured) {
-      setError('Configuration Missing: Please add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in the Settings menu (top right).');
+      const missing = [];
+      if (!configStatus.hasUrl) missing.push('VITE_SUPABASE_URL');
+      if (!configStatus.hasKey) missing.push('VITE_SUPABASE_ANON_KEY');
+      
+      setError(`Configuration Missing: Please ensure ${missing.join(' and ')} are added correctly in the Settings menu (top right) and that you have restarted the dev server.`);
       return;
     }
 
