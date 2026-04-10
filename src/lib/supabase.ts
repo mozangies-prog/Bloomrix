@@ -1,12 +1,16 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Try to get from Vite's import.meta.env first, then fallback to process.env
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || (typeof process !== 'undefined' ? process.env.VITE_SUPABASE_URL : undefined);
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || (typeof process !== 'undefined' ? process.env.VITE_SUPABASE_ANON_KEY : undefined);
+// Try to get from Vite's import.meta.env first, then fallback to process.env (defined in vite.config.ts)
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 
+                    (typeof process !== 'undefined' ? process.env.VITE_SUPABASE_URL : undefined) ||
+                    'https://mjznwfstkmkzbpxswndv.supabase.co'; // Hardcoded fallback for your project
+
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 
+                        (typeof process !== 'undefined' ? process.env.VITE_SUPABASE_ANON_KEY : undefined);
 
 export const configStatus = {
   hasUrl: Boolean(supabaseUrl && !supabaseUrl.includes('placeholder')),
-  hasKey: Boolean(supabaseAnonKey && !supabaseAnonKey.includes('placeholder')),
+  hasKey: Boolean(supabaseAnonKey && !supabaseAnonKey.includes('placeholder') && supabaseAnonKey !== 'undefined'),
   isConfigured: false
 };
 
@@ -23,6 +27,6 @@ if (!isConfigured) {
 }
 
 export const supabase = createClient(
-  supabaseUrl || 'https://mjznwfstkmkzbpxswndv.supabase.co', 
+  supabaseUrl, 
   supabaseAnonKey || 'placeholder-key'
 );
