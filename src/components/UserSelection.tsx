@@ -31,13 +31,18 @@ export default function UserSelection({ onSelect }: UserSelectionProps) {
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Login failed');
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.indexOf("application/json") !== -1) {
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || 'Login failed');
+        }
+        onSelect(data.user);
+      } else {
+        const text = await response.text();
+        console.error("Non-JSON response:", text);
+        throw new Error(`Server returned non-JSON response (${response.status}). The backend might not be running correctly.`);
       }
-
-      onSelect(data.user);
     } catch (err: any) {
       setError(err.message || 'Authentication failed');
     } finally {

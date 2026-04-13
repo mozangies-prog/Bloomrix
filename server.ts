@@ -37,6 +37,15 @@ async function startServer() {
   app.use(cors());
   app.use(express.json());
 
+  // Health check
+  app.get('/api/health', (req, res) => {
+    res.json({ 
+      status: 'ok', 
+      env: process.env.NODE_ENV,
+      supabaseConfigured: !!supabaseAdmin 
+    });
+  });
+
   // File upload configuration
   const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -164,6 +173,7 @@ async function startServer() {
   app.post('/api/login', async (req, res) => {
     try {
       const { email, password } = req.body;
+      console.log(`Login attempt for: ${email}`);
       
       if (!email || !password) {
         return res.status(400).json({ error: 'Email and password are required' });
@@ -384,6 +394,7 @@ async function startServer() {
 
   httpServer.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`Environment: ${process.env.NODE_ENV}`);
   });
 
   return { app, httpServer };
