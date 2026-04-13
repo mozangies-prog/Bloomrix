@@ -162,14 +162,19 @@ async function startServer() {
 
   // Simplified Login with Admin Bootstrapping
   app.post('/api/login', async (req, res) => {
-    const { email, password } = req.body;
-    const loginEmail = email.toLowerCase() === 'admin' ? 'admin@bloomrix.com' : email;
-
-    if (!supabaseAdmin) {
-      return res.status(500).json({ error: 'Supabase Admin SDK not configured.' });
-    }
-
     try {
+      const { email, password } = req.body;
+      
+      if (!email || !password) {
+        return res.status(400).json({ error: 'Email and password are required' });
+      }
+
+      const loginEmail = email.toLowerCase() === 'admin' ? 'admin@bloomrix.com' : email;
+
+      if (!supabaseAdmin) {
+        return res.status(500).json({ error: 'Supabase Admin SDK not configured. Check SUPABASE_SERVICE_ROLE_KEY.' });
+      }
+
       // 1. Check if it's the hardcoded admin
       if (email.toLowerCase() === 'admin' && password === 'admin123') {
         // Ensure admin user exists in Auth
@@ -185,7 +190,6 @@ async function startServer() {
           if (createError) throw createError;
           adminUser = newAuth.user;
         } else if (!adminUser.email_confirmed_at) {
-          // Force confirm if existing admin is not confirmed
           await supabaseAdmin.auth.admin.updateUserById(adminUser.id, { email_confirm: true });
         }
 
@@ -216,7 +220,6 @@ async function startServer() {
         
         if (userToConfirm) {
           await supabaseAdmin.auth.admin.updateUserById(userToConfirm.id, { email_confirm: true });
-          // Retry sign in after confirmation
           const retry = await supabaseAdmin.auth.signInWithPassword({
             email: loginEmail,
             password
@@ -226,8 +229,13 @@ async function startServer() {
         }
       }
 
-      if (authError) throw authError;
-      if (!authData.user) throw new Error('Login failed');
+      if (authError) {
+        return res.status(401).json({ error: authError.message });
+      }
+
+      if (!authData.user) {
+        return res.status(401).json({ error: 'Login failed' });
+      }
 
       const { data: userProfile, error: profileError } = await supabaseAdmin
         .from('users')
@@ -235,12 +243,14 @@ async function startServer() {
         .eq('id', authData.user.id)
         .single();
 
-      if (profileError) throw profileError;
+      if (profileError) {
+        return res.status(500).json({ error: 'User profile not found in database' });
+      }
 
-      res.json({ user: userProfile });
+      return res.json({ user: userProfile });
     } catch (err: any) {
       console.error('Login Error:', err);
-      res.status(401).json({ error: err.message });
+      return res.status(500).json({ error: err.message || 'An internal server error occurred' });
     }
   });
 
